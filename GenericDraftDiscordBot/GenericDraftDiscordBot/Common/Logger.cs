@@ -4,14 +4,9 @@ namespace GreetingsBot.Common;
 
 public static class Logger
 {
-    public static async Task Log(LogSeverity severity, string source, string message, Exception? exception = null)
+    public static void Log(LogSeverity severity, string source, string message, Exception? exception = null)
     {
-        await Log(new LogMessage(severity, source, message, exception));
-    }
-    
-    public static Task Log(LogMessage message)
-    {
-        switch (message.Severity)
+        switch (severity)
         {
             case LogSeverity.Critical:
             case LogSeverity.Error:
@@ -28,15 +23,7 @@ public static class Logger
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 break;
         }
-        Console.WriteLine($"{DateTime.Now,-19} [{message.Severity,8}] {message.Source}: {message.Message} {message.Exception}");
+        Console.WriteLine($"{DateTime.Now,-19} [{severity,8}] {source}: {message} {exception}");
         Console.ResetColor();
-        
-        // If you get an error saying 'CompletedTask' doesn't exist,
-        // your project is targeting .NET 4.5.2 or lower. You'll need
-        // to adjust your project's target framework to 4.6 or higher
-        // (instructions for this are easily Googled).
-        // If you *need* to run on .NET 4.5 for compat/other reasons,
-        // the alternative is to 'return Task.Delay(0);' instead.
-        return Task.CompletedTask;
     }
 }

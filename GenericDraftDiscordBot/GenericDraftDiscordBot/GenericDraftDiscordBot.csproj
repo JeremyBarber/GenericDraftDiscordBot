@@ -10,12 +10,14 @@
 
 	<ItemGroup>
 		<PackageReference Include="CrypticWizard.RandomWordGenerator" Version="0.9.3" />
+		<PackageReference Include="CsvHelper" Version="27.2.1" />
 		<PackageReference Include="Discord.Net" Version="3.3.0" />
 		<PackageReference Include="MedallionRandom" Version="1.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+		<PackageReference Include="System.Collections.Specialized" Version="4.3.0" />
 	</ItemGroup>
 
 	<ItemGroup>

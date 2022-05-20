@@ -3,6 +3,8 @@
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using GenericDraftDiscordBot.Modules;
+using GenericDraftDiscordBot.Modules.Draft;
 using GreetingsBot.Common;
 using GreetingsBot.Init;
 using GreetingsBot.Services;
@@ -30,8 +32,11 @@ var commands = new CommandService(new CommandServiceConfig
 Bootstrapper.Init();
 Bootstrapper.RegisterInstance(client);
 Bootstrapper.RegisterInstance(commands);
-Bootstrapper.RegisterType<ICommandHandler, CommandHandler>();
 Bootstrapper.RegisterInstance(config);
+Bootstrapper.RegisterType<ICommandHandler, CommandHandler>();
+Bootstrapper.RegisterType<IDraftStateManager, DraftStateManager>();
+Bootstrapper.RegisterType<IPassphraseGenerator, PassphraseGenerator>();
+
 
 await MainAsync();
 
@@ -41,14 +46,14 @@ async Task MainAsync()
     
     client.ShardReady += async shard =>
     {
-        await Logger.Log(LogSeverity.Info, "ShardReady", $"Shard Number {shard.ShardId} is connected and ready!");
+        Logger.Log(LogSeverity.Info, "ShardReady", $"Shard Number {shard.ShardId} is connected and ready!");
     };
         
     // Login and connect.
     var token = config.GetRequiredSection("Settings")["DiscordBotToken"];
     if (string.IsNullOrWhiteSpace(token))
     {
-        await Logger.Log(LogSeverity.Error, $"{nameof(Program)} | {nameof(MainAsync)}", "Token is null or empty.");
+        Logger.Log(LogSeverity.Error, $"{nameof(Program)} | {nameof(MainAsync)}", "Token is null or empty.");
         return;
     }
         

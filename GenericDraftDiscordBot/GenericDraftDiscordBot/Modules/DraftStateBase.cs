@@ -1,49 +1,51 @@
-﻿using Discord.WebSocket;
+﻿using Discord;
+using System.Collections.Specialized;
 
 namespace GenericDraftDiscordBot.Modules
 {
-    internal class DraftStateBase
+    public partial class DraftState
     {
-        protected readonly List<string> Items = new();
-        protected readonly List<SocketUser> Users = new();
+        protected readonly List<OrderedDictionary> Items = new();
+        protected readonly List<IMessageChannel> Channels = new();
 
         protected bool Started = false;
         protected bool Finished = false;
+
 
         private void ThrowIfStarted()
         {
             if (Started)
             {
-                throw new InvalidOperationException("Sorry, but the draft has already started and you can no longer make changes");
+                throw new UserFacingException("Sorry, but the draft has already started and you can no longer make changes");
             }
         }
 
-        public int SettItems(List<string> items)
+        public int SetItems(List<OrderedDictionary> items)
         {
             ThrowIfStarted();
 
-            items.Clear();
+            Items.Clear();
             Items.AddRange(items);
             return Items.Count;
         }
 
-        public int SetUsers(List<SocketUser> users)
+        public int SetChannels(List<IMessageChannel> channels)
         {
             ThrowIfStarted();
 
-            Users.Clear();
-            Users.AddRange(users);
-            return Users.Count;
+            Channels.Clear();
+            Channels.AddRange(channels);
+            return Channels.Count;
         }
 
-        public List<string> ViewDraftItems()
+        public List<OrderedDictionary> ViewDraftItems()
         {
             return Items;
         }
 
-        public List<SocketUser> ViewUsers()
+        public List<IMessageChannel> ViewChannels()
         {
-            return Users;
+            return Channels;
         }
     }
 }

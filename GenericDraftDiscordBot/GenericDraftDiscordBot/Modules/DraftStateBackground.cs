@@ -1,13 +1,14 @@
-﻿using GreetingsBot.Common;
+﻿using GenericDraftDiscordBot.Modules.DraftManagement.State;
+using GreetingsBot.Common;
 
 namespace GenericDraftDiscordBot.Modules
 {
-    internal partial class DraftState : IDisposable
+    public partial class DraftState : IDisposable
     {
-        public event EventHandler<EventArgs> ReadyToDeal;
+        public event EventHandler<ReadyToDealEventArgs> ReadyToDeal;
         public event EventHandler<EventArgs> DraftCompleted;
 
-        private readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource CancellationTokenSource = new();
 
         private readonly TimeSpan CycleTime = TimeSpan.FromSeconds(5);
 
@@ -23,7 +24,7 @@ namespace GenericDraftDiscordBot.Modules
         {
             while (true)
             {
-                Thread.Sleep(CycleTime);
+                Task.Delay(CycleTime);
 
                 if (UserItemBank.Values.All(x => x.Count == FinalBankSize))
                 {
@@ -32,21 +33,21 @@ namespace GenericDraftDiscordBot.Modules
                     break;
                 }
 
-                // If all users have the correct number of cards in their bank, rotate
                 if (UserItemBank.Values.All(x => x.Count == Round))
                 {
                     Round++;
                     RotateUserHands();
-                    ReadyToDeal?.Invoke(this, EventArgs.Empty);
+                    ReadyToDeal?.Invoke(this, new ReadyToDealEventArgs(Id, Round, DealOutHands()));
                 }
             }
         }
 
         private void RotateUserHands()
         {
-            foreach (var user in Users)
+            foreach (var channel in Channels)
             {
-                UserHandAssignments[user] = UserHandAssignments[user]++ % Users.Count;
+                var user = channel.Name;
+                UserHandAssignments[user] = UserHandAssignments[user]++ % Channels.Count;
             }
 
             if (Round == InitialHandSize)

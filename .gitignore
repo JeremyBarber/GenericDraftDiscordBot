@@ -3,3 +3,6 @@
 ################################################################################
 
 /GenericDraftDiscordBot/GenericDraftDiscordBot/obj
+/GenericDraftDiscordBot/GenericDraftDiscordBot/bin/Debug/net6.0
+/GenericDraftDiscordBot/.vs
+/GenericDraftDiscordBot/GenericDraftDiscordBot/appsettings.json

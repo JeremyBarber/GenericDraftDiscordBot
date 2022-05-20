@@ -1,34 +1,37 @@
-﻿using Discord.WebSocket;
+﻿using Discord;
 using GreetingsBot.Common;
 using Medallion;
+using System.Collections.Specialized;
 using System.Text;
 
 namespace GenericDraftDiscordBot.Modules
 {
-    internal partial class DraftState : DraftStateBase
+    public partial class DraftState
     {
         public readonly string Id;
         public readonly string Description;
-        public readonly SocketUser Owner;
+        public readonly IUser Owner;
+        public readonly IUserMessage Message;
 
         public int InitialHandSize { get; set; }
         public int FinalBankSize { get; set; }
 
         private int Round = 0;
 
-        private readonly Dictionary<SocketUser, List<string>> UserItemBank = new();
-        private readonly Dictionary<int, List<string>> DraftingHands = new();
-        private readonly Dictionary<SocketUser, int> UserHandAssignments = new();
+        private readonly Dictionary<string, List<OrderedDictionary>> UserItemBank = new();
+        private readonly Dictionary<int, List<OrderedDictionary>> DraftingHands = new();
+        private readonly Dictionary<string, int> UserHandAssignments = new();
 
-        private int RequiredNumberOfItems => InitialHandSize * Users.Count;
+        private int RequiredNumberOfItems => InitialHandSize * Channels.Count;
 
-        public DraftState(string id, string description, SocketUser owner)
+        public DraftState(string id, string description, IUserMessage message, IUser owner)
         {
             Id = id;
             Description = description;
+            Message = message;
             Owner = owner;
 
-            Logger.Log(Discord.LogSeverity.Info, id, $"{Owner.Username} created new DraftState with Id {id} for '{Description}'");
+            Logger.Log(LogSeverity.Info, id, $"{Owner.Username} created new DraftState with Id {id} for '{Description}'");
         }
 
         public void Start()
@@ -38,10 +41,10 @@ namespace GenericDraftDiscordBot.Modules
             // Set a flag to prevent usage of Update methods
             Started = true;
 
-            for (var i = 0; i < Users.Count; i++)
+            for (var i = 0; i < Channels.Count; i++)
             {
-                UserItemBank.Add(Users[i], new List<string>());
-                DraftingHands.Add(i, new List<string>());
+                UserItemBank.Add(Channels[i].Name, new List<OrderedDictionary>());
+                DraftingHands.Add(i, new List<OrderedDictionary>());
             }
 
             // Pull items from it and place them sequentially into the hands
@@ -49,43 +52,43 @@ namespace GenericDraftDiscordBot.Modules
 
             for (var i = 0; i < RequiredNumberOfItems; i++)
             {
-                DraftingHands[i % Users.Count].Add(Items[i]);
+                DraftingHands[i % Channels.Count].Add(Items[i]);
             }
 
             // Assign the hands to the players
-            for (var i = 0; i < Users.Count; i++)
+            for (var i = 0; i < Channels.Count; i++)
             {
-                UserHandAssignments[Users[i]] = i;
+                UserHandAssignments[Channels[i].Name] = i;
             }
 
             // Start the process for checking the draft pick state
             StartBackgroundProcess();
         }
 
-        public Dictionary<SocketUser, List<string>> DealOutHands()
+        public Dictionary<IMessageChannel, List<OrderedDictionary>> DealOutHands()
         {
-            var hands = new Dictionary<SocketUser, List<string>>();
+            var hands = new Dictionary<IMessageChannel, List<OrderedDictionary>>();
 
-            foreach (var user in Users)
+            foreach (var channel in Channels)
             {
-                hands.Add(user, DraftingHands[UserHandAssignments[user]]);
+                hands.Add(channel, DraftingHands[UserHandAssignments[channel.Name]]);
             }
 
             return hands;
         }
 
-        public string UpdateUserSelection(SocketUser user, int choice)
+        public OrderedDictionary UpdateUserSelection(string username, int choice)
         {
             // Check if the bank for the user equals the Round number. If so, throw
-            if (UserItemBank[user].Count == Round)
+            if (UserItemBank[username].Count == Round)
             {
-                throw new InvalidOperationException("Sorry, I have to accept your first answer!");
+                throw new UserFacingException("Sorry, I have to accept your first answer!");
             }
 
             // Update the bank for the user
-            var chosenItem = DraftingHands[UserHandAssignments[user]][choice];
-            DraftingHands[UserHandAssignments[user]].RemoveAt(choice);
-            UserItemBank[user].Add(chosenItem);
+            var chosenItem = DraftingHands[UserHandAssignments[username]][choice];
+            DraftingHands[UserHandAssignments[username]].RemoveAt(choice);
+            UserItemBank[username].Add(chosenItem);
 
             return chosenItem;
         }
@@ -118,22 +121,22 @@ namespace GenericDraftDiscordBot.Modules
         {
             if (InitialHandSize <= 0)
             {
-                throw new InvalidOperationException($"You need to set a hand size before starting the draft. Currently it's set to {InitialHandSize}.");
+                throw new UserFacingException($"You need to set a hand size before starting the draft. Currently it's set to {InitialHandSize}.");
             }
 
             if (FinalBankSize > InitialHandSize || FinalBankSize <= 0)
             {
-                throw new InvalidOperationException($"You need to set a final bank size that is less than the initial hand size before starting the draft. Currently it's set to {FinalBankSize}.");
+                throw new UserFacingException($"You need to set a final bank size that is less than the initial hand size before starting the draft. Currently it's set to {FinalBankSize}.");
             }
 
-            if (Users.Count <= 1)
+            if (Channels.Count <= 0)
             {
-                throw new InvalidOperationException($"You need to have at least two players before starting the draft. Currently only {Users.Count} players are registered");
+                throw new UserFacingException($"You need to have at least 2 players before starting the draft. Currently {Channels.Count} players are registered");
             }
 
             if (RequiredNumberOfItems > Items.Count)
             {
-                throw new InvalidOperationException($"To draft for {Users.Count} players starting with {InitialHandSize} items you require {RequiredNumberOfItems} items, but you only have {Items.Count} registered. " +
+                throw new UserFacingException($"To draft for {Channels.Count} players starting with {InitialHandSize} items you require {RequiredNumberOfItems} items, but you only have {Items.Count} registered. " +
                     $"Please add more before starting the draft");
             }
         }

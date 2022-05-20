@@ -12,9 +12,7 @@ public class CommandHandler : ICommandHandler
     private readonly DiscordShardedClient _client;
     private readonly CommandService _commands;
 
-    public CommandHandler(
-        DiscordShardedClient client, 
-        CommandService commands)
+    public CommandHandler(DiscordShardedClient client, CommandService commands)
     {
         _client = client;
         _commands = commands;
@@ -39,7 +37,7 @@ public class CommandHandler : ICommandHandler
         
         foreach (var module in _commands.Modules)
         {
-            await Logger.Log(LogSeverity.Info, $"{nameof(CommandHandler)} | Commands", $"Module '{module.Name}' initialized.");
+            Logger.Log(LogSeverity.Info, $"{nameof(CommandHandler)} | Commands", $"Module '{module.Name}' initialized.");
         }
     }
     

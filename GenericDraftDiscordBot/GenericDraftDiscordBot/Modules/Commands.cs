@@ -1,153 +1,146 @@
-using CrypticWizard.RandomWordGenerator;
 using Discord;
 using Discord.Commands;
-using Discord.WebSocket;
 using GenericDraftDiscordBot.Modules;
-using static CrypticWizard.RandomWordGenerator.WordGenerator;
+using GenericDraftDiscordBot.Modules.Draft;
+using GreetingsBot.Common;
 using RunMode = Discord.Commands.RunMode;
 
-namespace GreetingsBot.Modules;
-
-public class Commands : ModuleBase<ShardedCommandContext>
+namespace GreetingsBot.Modules
 {
-    private readonly DiscordShardedClient Client;
-
-    public Commands(DiscordShardedClient client)
+    public class Commands : ModuleBase<ShardedCommandContext>
     {
-        Client = client;
+        private readonly IDraftStateManager DraftStateManager;
+        private readonly IPassphraseGenerator PassphraseGenerator;
 
-        Client.SelectMenuExecuted += ProcessUserDraftSelection;
-    }
-
-    private static Dictionary<string, DraftState> DraftStates { get; set; } = new Dictionary<string, DraftState>();
-
-    [Command("DraftHelp", RunMode = RunMode.Async)]
-    public async Task Help()
-    {
-        await ReplyAsync($"The list of commands for the Draft Bot are.....");
-    }
-
-    [Command("DraftSetup", RunMode = RunMode.Async)]
-    public async Task Setup(int initialHandSize, int finalBankSize, string description)
-    {
-        // Generate a reasonably unique ID
-        var pattern = new List<PartOfSpeech>
+        public Commands(IDraftStateManager draftStateManager, IPassphraseGenerator passphraseGenerator)
         {
-            PartOfSpeech.adv,
-            PartOfSpeech.adj,
-            PartOfSpeech.noun
-        };
+            DraftStateManager = draftStateManager;
+            PassphraseGenerator = passphraseGenerator;
+        }
 
-        var phrase = new WordGenerator().GetPatterns(pattern, '-', 1).Single();
-
-        // Create a new DraftState and subscribe to its events
-        var newDraft = new DraftState(phrase, description, Context.Message.Author)
-        {
-            InitialHandSize = initialHandSize,
-            FinalBankSize = finalBankSize
-        };
-        //newDraft.ReadyToDeal += DealToUsers;
-        //newDraft.DraftCompleted += SendFinalStatement;
-        DraftStates.Add(phrase, newDraft);
-
-        // Send a message
-        var title = $"{Context.User.Username} has created a new Draft!";
-        var fields = new List<EmbedFieldBuilder>
-        {
-            new EmbedFieldBuilder().WithName("Hand Size").WithValue(initialHandSize).WithIsInline(true),
-            new EmbedFieldBuilder().WithName("Items To Pick").WithValue(finalBankSize).WithIsInline(true),
-            new EmbedFieldBuilder().WithName("Decsription").WithValue(description),
-            new EmbedFieldBuilder().WithName("ID").WithValue(phrase)
-        };
-
-        var message = await ReplyAsync("", embed: StandardEmbedFormatting(title, fields));
-        await message.AddReactionAsync(Emoji.Parse(":white_check_mark:"));
-    }
-
-    //[Command("DraftItems", RunMode = RunMode.Async)]
-    //public async Task Items()
-    //{
-    //    // The command must be sent with a json attachment
-    //}
-
-    //[Command("DraftStart", RunMode = RunMode.Async)]
-    //public async Task Start(string id)
-    //{
-    //    if (DraftStates.ContainsKey(id))
-    //    {
-    //        DraftStates[id].Start();
-    //    }
-    //    else
-    //    {
-
-    //    }
-
-
-    //    await Context.Interaction.RespondWithModalAsync(mb.Build());
-    //}
-
-    [Command("DraftCancel", RunMode = RunMode.Async)]
-    public async Task Cancel(string id) => await RunIfValidId(id, () => 
-        {
-            DraftStates[id].Dispose();
-            DraftStates.Remove(id);
-        });
-
-    [Command("DraftStatus", RunMode = RunMode.Async)]
-    public async Task Status(string id) => await RunIfValidId(id, () => ReplyAsync(DraftStates[id].Status()));
-
-    private async Task DealToUsers(string id)
-    {
-        var handsToDeal = DraftStates[id].DealOutHands();
-
-        foreach (var kvp in handsToDeal)
-        {
-            var menuBuilder = new SelectMenuBuilder()
-                .WithPlaceholder("Select an option")
-                .WithCustomId("menu-1")
-                .WithMinValues(1)
-                .WithMaxValues(1); 
-
-            for (var i = 0; i < kvp.Value.Count; i++)
+        [Command("DraftSetup", RunMode = RunMode.Async)]
+        public async Task Setup(int initialHandSize, int finalBankSize, string description) => await RunWithStandardisedErrorHandling(async () =>
             {
-                menuBuilder.AddOption(kvp.Value[i], i.ToString(), "");
+                var owner = Context.User;
+                var phrase = PassphraseGenerator.GetNew();
+
+                var title = $"{owner.Username} has created a new Draft!";
+                var fields = new List<EmbedFieldBuilder>
+                {
+                    new EmbedFieldBuilder().WithName("Hand Size").WithValue(initialHandSize).WithIsInline(true),
+                    new EmbedFieldBuilder().WithName("Items To Pick").WithValue(finalBankSize).WithIsInline(true),
+                    new EmbedFieldBuilder().WithName("Description").WithValue(description),
+                    new EmbedFieldBuilder().WithName("ID").WithValue(phrase)
+                };
+
+                var message = await StandardReply(title, fields);
+                await message.AddReactionAsync(DraftStateManager.GetRegistrationEmote());
+
+                DraftStateManager.CreateNew(owner, message, phrase, description, initialHandSize, finalBankSize);
+            });
+
+        [Command("DraftItems", RunMode = RunMode.Async)]
+        public async Task Items(string id) => await RunWithStandardisedErrorHandling(async () =>
+            {
+                var url = new Uri(Context.Message.Attachments.Single().Url);
+
+                var itemsRegistered = await DraftStateManager.AssignItemsToDraft(id, Context.Message.Author, url);
+
+                var title = $"{Context.User.Username} has registered {itemsRegistered} items in this draft";
+                var fields = new List<EmbedFieldBuilder>();
+
+                await StandardReply(title, fields);
+            });
+
+        [Command("DraftStart", RunMode = RunMode.Async)]
+        public async Task Start(string id) => await RunWithStandardisedErrorHandling(async () =>
+            {
+                await DraftStateManager.StartDraft(Context, id, Context.Message.Author);
+
+                var title = $"Draft Has Begun!";
+                var fields = new List<EmbedFieldBuilder>();
+
+                await StandardReply(title, fields);
+            });
+
+        [Command("DraftCancel", RunMode = RunMode.Async)]
+        public async Task Cancel(string id) => await RunWithStandardisedErrorHandling(async () =>
+            {
+                DraftStateManager.CancelDraft(id, Context.Message.Author);
+
+                var title = $"Draft {id} Has Been Cancelled";
+                var fields = new List<EmbedFieldBuilder>();
+
+                await StandardReply(title, fields);
+            });
+
+        [Command("DraftStatus", RunMode = RunMode.Async)]
+        public async Task Status(string id) => await RunWithStandardisedErrorHandling(async () =>
+            {
+                var status = DraftStateManager.GetStatusOfDraft(id);
+
+                var title = $"Draft Status";
+                var fields = new List<EmbedFieldBuilder>
+                {
+                    new EmbedFieldBuilder().WithName(id).WithValue(status)
+                };
+
+                await StandardReply(title, fields);
+            });
+
+        [Command("DraftHelp", RunMode = RunMode.Async)]
+        public async Task Help() => await RunWithStandardisedErrorHandling(async () =>
+            {
+                var title = $"GenericDraftBot Command Listing";
+                var fields = new List<EmbedFieldBuilder>
+                {
+                    new EmbedFieldBuilder().WithName("!DraftHelp").WithValue("Shows details of the available commands"),
+                    new EmbedFieldBuilder().WithName("!DraftSetup").WithValue("Register a new Draft (int: number of items in starting hands, int: number of items to draw, string: description of the draft"),
+                    new EmbedFieldBuilder().WithName("!DraftItems").WithValue("Set what items will be used for a particular Draft (string: Draft id, Attachment: .csv containing header row, unique ids, and item properties"),
+                    new EmbedFieldBuilder().WithName("!DraftStart").WithValue("Begin the Draft (string: Draft id)"),
+                    new EmbedFieldBuilder().WithName("!DraftCancel").WithValue("Stop and delete a Draft (string: Draft id)"),
+                    new EmbedFieldBuilder().WithName("!DraftStatus").WithValue("Provide information about the state of a Draft (string: Draft id)")
+                };
+
+                await StandardReply(title, fields);
+            });
+
+        private async Task RunWithStandardisedErrorHandling(Func<Task> action)
+        {
+            try
+            {
+                await action();
             }
+            catch (Exception ex) when (ex is UserFacingException)
+            {
+                Logger.Log(LogSeverity.Error, "Commands", ex.Message);
 
-            var builder = new ComponentBuilder()
-                .WithSelectMenu(menuBuilder);
+                var title = ex.Message;
+                var fields = new List<EmbedFieldBuilder>();
 
-            await kvp.Key.SendMessageAsync("Select next item", components: builder.Build());
+                await StandardReply(title, fields);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(LogSeverity.Error, "Commands", ex.Message);
+
+                var title = $"Sorry, GenericDraftBot was unable to complete your requested action due to an internal error.";
+                var fields = new List<EmbedFieldBuilder>();
+
+                await StandardReply(title, fields);
+            }
         }
-    }
 
-    private async Task SendFinalStatement(string id)
-    {
-
-    }
-
-    private async Task ProcessUserDraftSelection(SocketMessageComponent arg)
-    {
-        var text = string.Join(", ", arg.Data.Values);
-        await arg.RespondAsync($"You have selected {text}");
-    }
-
-    private async Task RunIfValidId(string id, Action action)
-    {
-        if (DraftStates.ContainsKey(id))
+        private async Task<IUserMessage> StandardReply(string title, List<EmbedFieldBuilder> fields)
         {
-            action();
-        }
-        else
-        {
-            await ReplyAsync($"Sorry, the id '{id}' does not appear to refer to any known Draft.");
+            var embeddedMessage = new EmbedBuilder()
+                .WithColor(Color.Blue)
+                .WithFooter("This action was performed by a bot")
+                .WithTitle(title)
+                .WithFields(fields)
+                .Build();
+
+            return await ReplyAsync("", embed: embeddedMessage, messageReference: new MessageReference(Context.Message.Id));
         }
     }
-
-    private Embed StandardEmbedFormatting(string title, List<EmbedFieldBuilder> fields) => 
-        new EmbedBuilder()
-            .WithColor(Color.Blue)
-            .WithFooter("This action was performed by a bot")
-            .WithTitle(title)
-            .WithFields(fields)
-            .Build();
 }

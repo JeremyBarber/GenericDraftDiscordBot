@@ -1,4 +1,4 @@
-﻿namespace GenericDraftDiscordBot.Modules
+﻿namespace GenericDraftDiscordBot.Modules.DraftManagement.Helpers
 {
     internal class UserFacingException : Exception
     {

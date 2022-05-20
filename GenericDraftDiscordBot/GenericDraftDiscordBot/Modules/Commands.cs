@@ -1,7 +1,7 @@
 using Discord;
 using Discord.Commands;
-using GenericDraftDiscordBot.Modules;
 using GenericDraftDiscordBot.Modules.Draft;
+using GenericDraftDiscordBot.Modules.DraftManagement.Helpers;
 using GreetingsBot.Common;
 using RunMode = Discord.Commands.RunMode;
 
@@ -33,7 +33,7 @@ namespace GreetingsBot.Modules
                     new EmbedFieldBuilder().WithName("ID").WithValue(phrase)
                 };
 
-                var message = await StandardReply(title, fields);
+                var message = await CommandResponse(title, fields);
                 await message.AddReactionAsync(DraftStateManager.GetRegistrationEmote());
 
                 DraftStateManager.CreateNew(owner, message, phrase, description, initialHandSize, finalBankSize);
@@ -49,7 +49,7 @@ namespace GreetingsBot.Modules
                 var title = $"{Context.User.Username} has registered {itemsRegistered} items in this draft";
                 var fields = new List<EmbedFieldBuilder>();
 
-                await StandardReply(title, fields);
+                await CommandResponse(title, fields);
             });
 
         [Command("DraftStart", RunMode = RunMode.Async)]
@@ -60,18 +60,18 @@ namespace GreetingsBot.Modules
                 var title = $"Draft Has Begun!";
                 var fields = new List<EmbedFieldBuilder>();
 
-                await StandardReply(title, fields);
+                await CommandResponse(title, fields);
             });
 
-        [Command("DraftCancel", RunMode = RunMode.Async)]
+        [Command("DraftStop", RunMode = RunMode.Async)]
         public async Task Cancel(string id) => await RunWithStandardisedErrorHandling(async () =>
             {
-                DraftStateManager.CancelDraft(id, Context.Message.Author);
+                DraftStateManager.StopDraft(id, Context.Message.Author);
 
-                var title = $"Draft {id} Has Been Cancelled";
+                var title = $"Draft {id} Has Been Stopped";
                 var fields = new List<EmbedFieldBuilder>();
 
-                await StandardReply(title, fields);
+                await CommandResponse(title, fields);
             });
 
         [Command("DraftStatus", RunMode = RunMode.Async)]
@@ -85,7 +85,7 @@ namespace GreetingsBot.Modules
                     new EmbedFieldBuilder().WithName(id).WithValue(status)
                 };
 
-                await StandardReply(title, fields);
+                await CommandResponse(title, fields);
             });
 
         [Command("DraftHelp", RunMode = RunMode.Async)]
@@ -95,14 +95,14 @@ namespace GreetingsBot.Modules
                 var fields = new List<EmbedFieldBuilder>
                 {
                     new EmbedFieldBuilder().WithName("!DraftHelp").WithValue("Shows details of the available commands"),
-                    new EmbedFieldBuilder().WithName("!DraftSetup").WithValue("Register a new Draft (int: number of items in starting hands, int: number of items to draw, string: description of the draft"),
-                    new EmbedFieldBuilder().WithName("!DraftItems").WithValue("Set what items will be used for a particular Draft (string: Draft id, Attachment: .csv containing header row, unique ids, and item properties"),
-                    new EmbedFieldBuilder().WithName("!DraftStart").WithValue("Begin the Draft (string: Draft id)"),
-                    new EmbedFieldBuilder().WithName("!DraftCancel").WithValue("Stop and delete a Draft (string: Draft id)"),
-                    new EmbedFieldBuilder().WithName("!DraftStatus").WithValue("Provide information about the state of a Draft (string: Draft id)")
+                    new EmbedFieldBuilder().WithName("!DraftSetup [HandSize <int>] [BankSize <int>] [Description <string>]").WithValue("Register a new Draft and define the initial config"),
+                    new EmbedFieldBuilder().WithName("!DraftItems [ID <string>] [Items <.csv attachment>]").WithValue("Set what items will be used for a particular Draft. Attachment must be .csv with header row and first column as a unique id"),
+                    new EmbedFieldBuilder().WithName("!DraftStart [ID <string>]").WithValue("Begin the Draft"),
+                    new EmbedFieldBuilder().WithName("!DraftCancel [ID <string>] ").WithValue("Stop and delete a Draft"),
+                    new EmbedFieldBuilder().WithName("!DraftStatus [ID <string>] ").WithValue("Provide information about the state of a Draft")
                 };
 
-                await StandardReply(title, fields);
+                await CommandResponse(title, fields);
             });
 
         private async Task RunWithStandardisedErrorHandling(Func<Task> action)
@@ -118,7 +118,7 @@ namespace GreetingsBot.Modules
                 var title = ex.Message;
                 var fields = new List<EmbedFieldBuilder>();
 
-                await StandardReply(title, fields);
+                await CommandResponse(title, fields);
             }
             catch (Exception ex)
             {
@@ -127,20 +127,24 @@ namespace GreetingsBot.Modules
                 var title = $"Sorry, GenericDraftBot was unable to complete your requested action due to an internal error.";
                 var fields = new List<EmbedFieldBuilder>();
 
-                await StandardReply(title, fields);
+                await CommandResponse(title, fields);
             }
         }
 
-        private async Task<IUserMessage> StandardReply(string title, List<EmbedFieldBuilder> fields)
+        private async Task<IUserMessage> CommandResponse(string title, List<EmbedFieldBuilder> fields)
         {
             var embeddedMessage = new EmbedBuilder()
                 .WithColor(Color.Blue)
-                .WithFooter("This action was performed by a bot")
+                .WithFooter($"This action was triggered by '{Context.Message.Author.Username}: {Context.Message.Content}'")
                 .WithTitle(title)
                 .WithFields(fields)
                 .Build();
 
-            return await ReplyAsync("", embed: embeddedMessage, messageReference: new MessageReference(Context.Message.Id));
+            var message = await ReplyAsync("", embed: embeddedMessage);
+
+            await Context.Message.DeleteAsync();
+
+            return message;
         }
     }
 }

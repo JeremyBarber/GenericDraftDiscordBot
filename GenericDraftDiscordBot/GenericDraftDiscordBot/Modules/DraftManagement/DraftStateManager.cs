@@ -2,6 +2,7 @@
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using GenericDraftDiscordBot.Modules.DraftManagement.Helpers;
 using GenericDraftDiscordBot.Modules.DraftManagement.State;
 using System.Collections.Specialized;
 using System.Globalization;
@@ -12,11 +13,14 @@ namespace GenericDraftDiscordBot.Modules.Draft
     public class DraftStateManager : IDraftStateManager
     {
         public readonly Dictionary<string, DraftState> DraftStates = new();
+        public readonly IChannelManager ChannelManager;
 
         public IEmote GetRegistrationEmote() => Emoji.Parse(":white_check_mark:");
 
-        public DraftStateManager(DiscordShardedClient client)
+        public DraftStateManager(DiscordShardedClient client, IChannelManager channelManager)
         {
+            ChannelManager = channelManager;
+
             client.SelectMenuExecuted += OnProcessUserDraftSelection;
         }
 
@@ -30,9 +34,8 @@ namespace GenericDraftDiscordBot.Modules.Draft
             };
 
             newDraft.ReadyToDeal += OnReadyToDeal;
-            //newDraft.DraftCompleted += SendFinalStatement;
+            newDraft.DraftCompleted += OnSendFinalStatement;
 
-            // Save the message so we can find it later
             DraftStates.Add(phrase, newDraft);
         }
 
@@ -62,7 +65,7 @@ namespace GenericDraftDiscordBot.Modules.Draft
                 }
             }
 
-            DraftStates[id].SetItems(items);
+            DraftStates[id].Items = items;
 
             return items.Count;
         }
@@ -77,44 +80,35 @@ namespace GenericDraftDiscordBot.Modules.Draft
 
             var registeredHumanUsers = registeredUsers.Where(x => !x.IsBot).ToList();
 
-            var denyView = new OverwritePermissions(viewChannel: PermValue.Deny);
-            var allowView = new OverwritePermissions(viewChannel: PermValue.Allow);
+            var channels = await ChannelManager.CreatePrivateChannels(id, context, registeredHumanUsers);
 
-            var channels = new List<IMessageChannel>();
-
-            var category = await context.Guild.CreateCategoryChannelAsync(id);
-            foreach (var user in registeredHumanUsers)
-            {
-                var newChannel = await context.Guild.CreateTextChannelAsync(user.Username, prop => prop.CategoryId = category.Id);
-                
-                await newChannel.AddPermissionOverwriteAsync(context.Guild.EveryoneRole, denyView);
-                await newChannel.AddPermissionOverwriteAsync(user, allowView);
-
-                channels.Add(newChannel);
-            }
-
-            DraftStates[id].SetChannels(channels);
+            DraftStates[id].UserChannels = channels;
             DraftStates[id].Start();
         }
 
-        public void CancelDraft(string id, IUser caller)
+        public async void StopDraft(string id, IUser caller)
         {
             ValidateOwnership(id, caller);
 
+            await ChannelManager.RemovePrivateChannels(id);
+
             DraftStates[id].Dispose();
             DraftStates.Remove(id);
+
         }
 
         public string GetStatusOfDraft(string id)
         {
+            Validate(id);
+
             return DraftStates[id].Status();
         }
 
-        private readonly EventHandler<ReadyToDealEventArgs> OnReadyToDeal = async (sender, eventArgs) =>
+        private readonly EventHandler<DraftStateBroadcastEventArgs> OnReadyToDeal = async (sender, eventArgs) =>
         {
             foreach (var userItems in eventArgs.Hands)
             {
-                var username = userItems.Key;
+                var user = userItems.Key;
                 var items = userItems.Value;
 
                 var menuBuilder = new SelectMenuBuilder()
@@ -140,27 +134,49 @@ namespace GenericDraftDiscordBot.Modules.Draft
                     fieldBuilder.Add(field);
                 }
 
-                await StandardMessage(username, $"{username}, please make your next selection for Round {eventArgs.Round} of Draft {eventArgs.Id}", fieldBuilder, menuBuilder);
+                await StandardMessageWithMenu(eventArgs.MessageChannels[user], $"{user.Username}, please make your next selection for Round {eventArgs.Round} of Draft {eventArgs.Id}", fieldBuilder, menuBuilder);
             }
         };
 
         private async Task OnProcessUserDraftSelection(SocketMessageComponent arg)
         {
-            var channel = arg.Channel;
+            var user = arg.User;
             var id = arg.Data.CustomId;
             var choice = int.Parse(arg.Data.Values.Single());
 
             Validate(id);
 
-            DraftStates[id].UpdateUserSelection(channel.Name, choice);
+            var item = DraftStates[id].BankItemSelection(user, choice);
 
-            await arg.RespondAsync($"Your choice of {choice} has been recorded. Please wait while the other User's make their selections.");
+            var field = new EmbedFieldBuilder().WithName("Choice").WithValue($"{choice} - {item[0].ToString()}");
+            await StandardMessage(arg.Channel, "Please wait while the other Users make their selections", new List<EmbedFieldBuilder> { field });
+            await arg.Message.DeleteAsync();
         }
 
-        private async Task SendFinalStatement(string id)
+        private readonly EventHandler<DraftStateBroadcastEventArgs> OnSendFinalStatement = async (sender, eventArgs) =>
         {
-            // delete all the channels, delete the category
-        }
+            var fieldBuilder = new List<EmbedFieldBuilder>();
+            foreach (var userItems in eventArgs.UserItemBank)
+            {
+                var user = userItems.Key;
+                var items = userItems.Value;
+
+                var field = new EmbedFieldBuilder().WithName(user.Username);
+                var valueString = new StringBuilder();
+                foreach (var item in items)
+                {
+                    valueString.Append($"{item[0].ToString()}, ");
+                }
+                field.WithValue(valueString.ToString());
+
+                await StandardMessage(eventArgs.MessageChannels[user], $"{user}, this Draft has ended. You selection is:", new List<EmbedFieldBuilder> { field });
+
+                fieldBuilder.Add(field);
+            }
+
+            var mainChannel = eventArgs.Message.Channel;
+            await StandardMessage(mainChannel, $"{mainChannel}, this Draft has ended. Selections are as follows:", fieldBuilder);
+        };
 
         private void ValidateOwnership(string id, IUser caller)
         {
@@ -180,11 +196,23 @@ namespace GenericDraftDiscordBot.Modules.Draft
             }
         }
 
-        private static async Task StandardMessage(IMessageChannel channel, string title, List<EmbedFieldBuilder> fields, SelectMenuBuilder menuItems)
+        private static async Task StandardMessage(IMessageChannel channel, string title, List<EmbedFieldBuilder> fields)
         {
             var embeddedMessage = new EmbedBuilder()
                 .WithColor(Color.Teal)
-                .WithFooter("This action was performed by a bot")
+                .WithFooter("This action was triggered by an event")
+                .WithTitle(title)
+                .WithFields(fields)
+                .Build();
+
+            await channel.SendMessageAsync("", embed: embeddedMessage);
+        }
+
+        private static async Task StandardMessageWithMenu(IMessageChannel channel, string title, List<EmbedFieldBuilder> fields, SelectMenuBuilder menuItems)
+        {
+            var embeddedMessage = new EmbedBuilder()
+                .WithColor(Color.Teal)
+                .WithFooter("This action was triggered by an event")
                 .WithTitle(title)
                 .WithFields(fields)
                 .Build();

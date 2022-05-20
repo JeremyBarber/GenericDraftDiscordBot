@@ -1,7 +1,7 @@
 ﻿using CrypticWizard.RandomWordGenerator;
 using static CrypticWizard.RandomWordGenerator.WordGenerator;
 
-namespace GenericDraftDiscordBot.Modules
+namespace GenericDraftDiscordBot.Modules.DraftManagement.Helpers
 {
     public class PassphraseGenerator : IPassphraseGenerator
     {

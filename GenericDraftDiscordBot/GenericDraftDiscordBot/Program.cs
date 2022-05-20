@@ -3,8 +3,9 @@
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-using GenericDraftDiscordBot.Modules;
 using GenericDraftDiscordBot.Modules.Draft;
+using GenericDraftDiscordBot.Modules.DraftManagement.Helpers;
+using GenericDraftDiscordBot.Modules.DraftManagement.State;
 using GreetingsBot.Common;
 using GreetingsBot.Init;
 using GreetingsBot.Services;
@@ -35,6 +36,7 @@ Bootstrapper.RegisterInstance(commands);
 Bootstrapper.RegisterInstance(config);
 Bootstrapper.RegisterType<ICommandHandler, CommandHandler>();
 Bootstrapper.RegisterType<IDraftStateManager, DraftStateManager>();
+Bootstrapper.RegisterType<IChannelManager, ChannelManager>();
 Bootstrapper.RegisterType<IPassphraseGenerator, PassphraseGenerator>();
 
 

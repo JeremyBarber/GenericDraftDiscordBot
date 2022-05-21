@@ -82,11 +82,13 @@ namespace GenericDraftDiscordBot.Modules
             Message = message;
             Owner = owner;
 
-            Logger.Log(LogSeverity.Info, id, $"{Owner.Username} created new DraftState with Id {id} for '{Description}'");
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"{Owner.Username} created new DraftState with Id {id} for '{Description}'");
         }
 
         public void Start()
         {
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} is starting");
+
             ThrowIfUnableToStart();
 
             Started = true;
@@ -110,6 +112,8 @@ namespace GenericDraftDiscordBot.Modules
 
         public OrderedDictionary BankItemSelection(IUser user, int choice)
         {
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} is receiving choice {choice} from {user.Username}");
+
             if (UserItemBank[user].Count == Round)
             {
                 throw new UserFacingException($"Sorry {user}, I have to accept your first answer!");
@@ -124,6 +128,8 @@ namespace GenericDraftDiscordBot.Modules
 
         public string Status()
         {
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} is producing status message");
+
             var statusStringBuilder = new StringBuilder();
 
             if (!Started && !Finished)
@@ -138,8 +144,8 @@ namespace GenericDraftDiscordBot.Modules
                 var respondedUsers = UserItemBank.Where(x => x.Value.Count == Round).Select(x => x.Key.Username);
                 var waitingUsers = UserItemBank.Where(x => x.Value.Count != Round).Select(x => x.Key.Username);
 
-                statusStringBuilder.AppendLine($"Users {string.Join(',', respondedUsers)} have registered a choice");
-                statusStringBuilder.AppendLine($"Users {string.Join(',', waitingUsers)} have not yet chosen");
+                statusStringBuilder.AppendLine($"Users {string.Join(", ", respondedUsers)} have registered a choice");
+                statusStringBuilder.AppendLine($"Users {string.Join(", ", waitingUsers)} have not yet chosen");
             }
             else if (Finished)
             {
@@ -155,6 +161,8 @@ namespace GenericDraftDiscordBot.Modules
 
         private void DraftingEventTrigger()
         {
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} event trigger is starting");
+
             var cancellationToken = CancellationTokenSource.Token;
 
             while (!Finished && !cancellationToken.IsCancellationRequested)
@@ -163,20 +171,26 @@ namespace GenericDraftDiscordBot.Modules
 
                 if (UserItemBank.Values.All(x => x.Count == FinalBankSize))
                 {
+                    Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} is firing event {nameof(DraftCompleted)}");
                     Finished = true;
                     DraftCompleted?.Invoke(this, BuildEventArgs());
                 }
                 else if (UserItemBank.Values.All(x => x.Count == Round))
                 {
+                    Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} is firing event {nameof(ReadyToDeal)}");
                     Round++;
                     RotateUserHands();
                     ReadyToDeal?.Invoke(this, BuildEventArgs());
                 }
             }
+
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} event trigger is stopping");
         }
 
         private void RotateUserHands()
         {
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} is rotating user hands");
+
             foreach (var userChannel in UserChannels)
             {
                 var user = userChannel.Key;
@@ -235,7 +249,7 @@ namespace GenericDraftDiscordBot.Modules
 
         public void Dispose()
         {
-            Logger.Log(LogSeverity.Info, Id, $"Disposing of Draft '{Id}'");
+            Logger.Log(LogSeverity.Verbose, nameof(DraftState), $"Draft {Id} is disposing");
             CancellationTokenSource.Cancel();
         }
     }

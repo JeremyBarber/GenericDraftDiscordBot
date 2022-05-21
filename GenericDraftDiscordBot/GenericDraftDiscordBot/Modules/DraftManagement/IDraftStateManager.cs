@@ -6,7 +6,7 @@ namespace GenericDraftDiscordBot.Modules.Draft
     public interface IDraftStateManager
     {
         IEmote GetRegistrationEmote();
-        Task<int> AssignItemsToDraft(string id, IUser caller, Uri url);
+        Task<int> AssignItemsToDraft(string id, IUser caller, IReadOnlyCollection<Attachment> attachments);
         void StopDraft(string id, IUser caller);
         void CreateNew(IUser owner, IUserMessage message, string phrase, string description, int initialHandSize, int finalBankSize);
         string GetStatusOfDraft(string id);

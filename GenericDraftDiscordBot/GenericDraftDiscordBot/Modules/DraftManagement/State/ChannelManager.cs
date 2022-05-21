@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Commands;
 using Discord.Rest;
+using GreetingsBot.Common;
 
 namespace GenericDraftDiscordBot.Modules.DraftManagement.State
 {
@@ -11,6 +12,8 @@ namespace GenericDraftDiscordBot.Modules.DraftManagement.State
 
         public async Task<Dictionary<IUser, IMessageChannel>> CreatePrivateChannels(string id, ShardedCommandContext context, List<IUser> users)
         {
+            Logger.Log(LogSeverity.Verbose, nameof(ChannelManager), $"Creating private channels for {id}");
+
             var channels = new Dictionary<IUser, RestTextChannel>();
 
             var category = await context.Guild.CreateCategoryChannelAsync(id);
@@ -32,6 +35,8 @@ namespace GenericDraftDiscordBot.Modules.DraftManagement.State
 
         public async Task RemovePrivateChannels(string id)
         {
+            Logger.Log(LogSeverity.Verbose, nameof(ChannelManager), $"Deleting private channels for {id}");
+
             foreach (var channel in ManagedChannels[id])
             {
                 await channel.DeleteAsync();

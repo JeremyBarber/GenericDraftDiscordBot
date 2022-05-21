@@ -1,6 +1,10 @@
 # GenericDraftDiscordBot
 A Discord bot for running generic drafts across multiple users
 
+It takes a set of items and their properties, then shuffles them into hands. The hands are rotated around the registered users who then get to pick one item in secret from each hand before it is passed to the next user. The process ends when each user has banked enough items.
+
+This project is based on the template project provided by https://github.com/schroedermarius/GreetingsBot.NET because I'm too lazy to set up my own DI boilerplate!
+
 # CLI
 
 `!DraftHelp`
@@ -37,6 +41,10 @@ Provide information about the state of a Draft
 
 # Future work
 
+- Proper ILogger support
+
 - Better lifecycle control so it can run indefinitely without thread leaks
+
+- Docker image and all that good stuff
 
 - Add a config update command

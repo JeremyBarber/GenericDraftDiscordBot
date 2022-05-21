@@ -24,7 +24,7 @@ namespace GreetingsBot.Modules
                 var owner = Context.User;
                 var phrase = PassphraseGenerator.GetNew();
 
-                var title = $"{owner.Username} has created a new Draft!";
+                var title = $"{owner.Username} has created a new Draft";
                 var fields = new List<EmbedFieldBuilder>
                 {
                     new EmbedFieldBuilder().WithName("Hand Size").WithValue(initialHandSize).WithIsInline(true),
@@ -42,11 +42,9 @@ namespace GreetingsBot.Modules
         [Command("DraftItems", RunMode = RunMode.Async)]
         public async Task Items(string id) => await RunWithStandardisedErrorHandling(async () =>
             {
-                var url = new Uri(Context.Message.Attachments.Single().Url);
+                var itemsRegistered = await DraftStateManager.AssignItemsToDraft(id, Context.Message.Author, Context.Message.Attachments);
 
-                var itemsRegistered = await DraftStateManager.AssignItemsToDraft(id, Context.Message.Author, url);
-
-                var title = $"{Context.User.Username} has registered {itemsRegistered} items in this draft";
+                var title = $"Draft '{id}' has {itemsRegistered} items registered";
                 var fields = new List<EmbedFieldBuilder>();
 
                 await CommandResponse(title, fields);
@@ -57,7 +55,7 @@ namespace GreetingsBot.Modules
             {
                 await DraftStateManager.StartDraft(Context, id, Context.Message.Author);
 
-                var title = $"Draft Has Begun!";
+                var title = $"Draft '{id}' has begun";
                 var fields = new List<EmbedFieldBuilder>();
 
                 await CommandResponse(title, fields);
@@ -68,7 +66,7 @@ namespace GreetingsBot.Modules
             {
                 DraftStateManager.StopDraft(id, Context.Message.Author);
 
-                var title = $"Draft {id} Has Been Stopped";
+                var title = $"Draft '{id}' has been stopped";
                 var fields = new List<EmbedFieldBuilder>();
 
                 await CommandResponse(title, fields);
@@ -79,7 +77,7 @@ namespace GreetingsBot.Modules
             {
                 var status = DraftStateManager.GetStatusOfDraft(id);
 
-                var title = $"Draft Status";
+                var title = $"Draft '{id}' status";
                 var fields = new List<EmbedFieldBuilder>
                 {
                     new EmbedFieldBuilder().WithName(id).WithValue(status)
@@ -113,7 +111,7 @@ namespace GreetingsBot.Modules
             }
             catch (Exception ex) when (ex is UserFacingException)
             {
-                Logger.Log(LogSeverity.Error, "Commands", ex.Message);
+                Logger.Log(LogSeverity.Warning, nameof(Commands), $"Sending user exception {ex.Message}");
 
                 var title = ex.Message;
                 var fields = new List<EmbedFieldBuilder>();
@@ -122,7 +120,7 @@ namespace GreetingsBot.Modules
             }
             catch (Exception ex)
             {
-                Logger.Log(LogSeverity.Error, "Commands", ex.Message);
+                Logger.Log(LogSeverity.Error, nameof(Commands), ex.Message);
 
                 var title = $"Sorry, GenericDraftBot was unable to complete your requested action due to an internal error.";
                 var fields = new List<EmbedFieldBuilder>();
@@ -139,6 +137,8 @@ namespace GreetingsBot.Modules
                 .WithTitle(title)
                 .WithFields(fields)
                 .Build();
+
+            Logger.Log(LogSeverity.Info, nameof(Commands), $"Posting message titled '{title}'");
 
             var message = await ReplyAsync("", embed: embeddedMessage);
 

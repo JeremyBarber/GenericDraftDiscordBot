@@ -154,19 +154,21 @@ namespace GenericDraftDiscordBot.Modules.Draft
 
         private async Task OnProcessUserDraftSelection(SocketMessageComponent arg)
         {
+            Logger.Log(LogSeverity.Verbose, nameof(DraftStateManager), $"Request to handle Draft {arg.Data.CustomId} event in {nameof(OnProcessUserDraftSelection)}");
+
             var user = arg.User;
             var id = arg.Data.CustomId;
             var choice = int.Parse(arg.Data.Values.Single());
-
-            Logger.Log(LogSeverity.Verbose, nameof(DraftStateManager), $"Request to handle Draft {id} event in {nameof(OnProcessUserDraftSelection)}");
+            var itemName = ((SelectMenuComponent)arg.Message.Components.First().Components.First()).Options.ElementAt(choice).Label;
 
             Validate(id);
 
-            var item = DraftStates[id].BankItemSelection(user, choice);
-
-            var field = new EmbedFieldBuilder().WithName("Choice").WithValue($"{choice} - {item[0]?.ToString()}");
-            await StandardMessage(arg.Channel, "Please wait while the other Users make their selections", new List<EmbedFieldBuilder> { field });
             await arg.Message.DeleteAsync();
+
+            var field = new EmbedFieldBuilder().WithName("Choice").WithValue($"{choice} - {itemName}");
+            await StandardMessage(arg.Channel, "Please wait while the other Users make their selections", new List<EmbedFieldBuilder> { field });
+
+            DraftStates[id].BankItemSelection(user, choice);
         }
 
         private readonly EventHandler<DraftStateBroadcastEventArgs> OnSendFinalStatement = async (sender, eventArgs) =>

@@ -116,7 +116,7 @@ namespace GenericDraftDiscordBot.Modules
 
             if (UserItemBank[user].Count == Round)
             {
-                throw new UserFacingException($"Sorry {user}, I have to accept your first answer!");
+                throw new UserFacingException($"Sorry {user}, I have to accept your first answer");
             }
 
             var chosenItem = DraftingHands[UserHandAssignments[user]][choice];
@@ -138,14 +138,13 @@ namespace GenericDraftDiscordBot.Modules
             }
             else if (Started && !Finished)
             {
-                statusStringBuilder.AppendLine("The draft is in progress.");
-                statusStringBuilder.AppendLine($"It is Round {Round} of {FinalBankSize}");
+                statusStringBuilder.AppendLine($"The draft is in progress and is currently in Round {Round} of {FinalBankSize}");
 
                 var respondedUsers = UserItemBank.Where(x => x.Value.Count == Round).Select(x => x.Key.Username);
                 var waitingUsers = UserItemBank.Where(x => x.Value.Count != Round).Select(x => x.Key.Username);
 
-                statusStringBuilder.AppendLine($"Users {string.Join(", ", respondedUsers)} have registered a choice");
-                statusStringBuilder.AppendLine($"Users {string.Join(", ", waitingUsers)} have not yet chosen");
+                statusStringBuilder.AppendLine($"The following Users have registered a choice this round: {string.Join(", ", respondedUsers)} ");
+                statusStringBuilder.AppendLine($"The following Users have yet to register a choice this round: {string.Join(", ", waitingUsers)}");
             }
             else if (Finished)
             {

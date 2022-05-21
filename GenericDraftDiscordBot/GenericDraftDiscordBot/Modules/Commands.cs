@@ -140,9 +140,9 @@ namespace GreetingsBot.Modules
 
             Logger.Log(LogSeverity.Info, nameof(Commands), $"Posting message titled '{title}'");
 
-            var message = await ReplyAsync("", embed: embeddedMessage);
-
             await Context.Message.DeleteAsync();
+
+            var message = await ReplyAsync("", embed: embeddedMessage);
 
             return message;
         }

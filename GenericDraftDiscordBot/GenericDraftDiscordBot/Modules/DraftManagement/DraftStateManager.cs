@@ -193,7 +193,7 @@ namespace GenericDraftDiscordBot.Modules.Draft
             }
 
             var mainChannel = eventArgs.Message.Channel;
-            await StandardMessage(mainChannel, $"Draft' {eventArgs.Id}' has ended as follows:", fieldBuilder);
+            await StandardMessage(mainChannel, $"Draft '{eventArgs.Id}' has ended as follows:", fieldBuilder);
         };
 
         private Uri ValidateAttachments(IReadOnlyCollection<Attachment> attachments)

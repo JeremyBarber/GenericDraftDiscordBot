@@ -193,7 +193,7 @@ namespace GenericDraftDiscordBot.Modules
             foreach (var userChannel in UserChannels)
             {
                 var user = userChannel.Key;
-                UserHandAssignments[user] = UserHandAssignments[user]++ % UserChannels.Count;
+                UserHandAssignments[user] = (UserHandAssignments[user] + 1) % UserChannels.Count;
             }
         }
 
@@ -234,7 +234,7 @@ namespace GenericDraftDiscordBot.Modules
                 throw new UserFacingException($"You need to set a final bank size that is less than the initial hand size before starting the draft. Currently it's set to {FinalBankSize}.");
             }
 
-            if (UserChannels.Count <= 0)
+            if (UserChannels.Count <= 1)
             {
                 throw new UserFacingException($"You need to have at least 2 players before starting the draft. Currently {UserChannels.Count} players are registered");
             }
